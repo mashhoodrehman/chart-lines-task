@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import HiringInsights from "./components/HiringInsights";
 
@@ -24,9 +26,9 @@ const App = () => {
   const insightsData = generateMockData(30);
 
   return (
-    <>
+    <div className="p-4">
       <HiringInsights initialData={insightsData} />
-    </>
+    </div>
   );
 };
 
