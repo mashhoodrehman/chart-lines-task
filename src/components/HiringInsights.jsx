@@ -1,31 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Line } from "react-chartjs-2";
+import React, { useState, useEffect } from "react";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
   Tooltip,
   Legend,
-} from "chart.js";
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
 import { ChevronDown } from "lucide-react";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
 const HiringInsights = ({ initialData = null }) => {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
   const [timeframe, setTimeframe] = useState("Last 30 days");
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -33,6 +22,15 @@ const HiringInsights = ({ initialData = null }) => {
     "Last 7 days": 7,
     "Last 14 days": 14,
     "Last 30 days": 30,
+  };
+
+  const formatChartData = (rawData) => {
+    return rawData.labels.map((label, index) => ({
+      day: label,
+      applicationToInterviewRate: rawData.datasets.applicationToInterviewRate[index],
+      offerAcceptanceRate: rawData.datasets.offerAcceptanceRate[index],
+      rejectionRate: rawData.datasets.rejectionRate[index],
+    }));
   };
 
   const getHiringInsights = async (days) => {
@@ -44,13 +42,13 @@ const HiringInsights = ({ initialData = null }) => {
           ),
           datasets: {
             applicationToInterviewRate: Array.from({ length: days }, (_, i) =>
-              Math.floor(40 + 30 * Math.sin(i / 4))
+              Math.floor(100 * (i + 1) / days)
             ),
             offerAcceptanceRate: Array.from({ length: days }, (_, i) =>
-              Math.floor(50 + 25 * Math.cos(i / 5))
+              Math.floor(100 * Math.pow(i / days, 1.2))
             ),
             rejectionRate: Array.from({ length: days }, (_, i) =>
-              Math.floor(60 + 30 * Math.sin(i / 6 + 2))
+              Math.floor(100 * Math.abs(Math.sin(i / 10)) / 3)
             ),
           },
         });
@@ -59,12 +57,16 @@ const HiringInsights = ({ initialData = null }) => {
   };
 
   const fetchAndSetData = async (days) => {
-    const chartData = await getHiringInsights(days);
-    setData(chartData);
+    const rawData = await getHiringInsights(days);
+    setData(formatChartData(rawData));
   };
 
   useEffect(() => {
-    if (!initialData) fetchAndSetData(30);
+    if (initialData) {
+      setData(formatChartData(initialData));
+    } else {
+      fetchAndSetData(30);
+    }
   }, [initialData]);
 
   const handleSelect = (label) => {
@@ -73,72 +75,23 @@ const HiringInsights = ({ initialData = null }) => {
     fetchAndSetData(timeframeOptions[label]);
   };
 
-  const chartData = data
-    ? {
-        labels: data.labels,
-        datasets: [
-          {
-            label: "Application to Interview Rate",
-            data: data.datasets.applicationToInterviewRate,
-            borderColor: "#22c55e",
-            backgroundColor: "#22c55e",
-            tension: 0.4,
-          },
-          {
-            label: "Offer Acceptance Rate",
-            data: data.datasets.offerAcceptanceRate,
-            borderColor: "#8b5cf6",
-            backgroundColor: "#8b5cf6",
-            tension: 0.4,
-          },
-          {
-            label: "Rejection Rate",
-            data: data.datasets.rejectionRate,
-            borderColor: "#f97316",
-            backgroundColor: "#f97316",
-            tension: 0.4,
-          },
-        ],
-      }
-    : null;
-
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "bottom",
-        labels: {
-          color: "#000",
-        },
-      },
-      tooltip: {
-        mode: "index",
-        intersect: false,
-      },
-    },
-    interaction: {
-      mode: "nearest",
-      axis: "x",
-      intersect: false,
-    },
-    scales: {
-      y: {
-        ticks: {
-          color: "#6b7280",
-        },
-        grid: {
-          color: "#e5e7eb",
-        },
-      },
-      x: {
-        ticks: {
-          color: "#6b7280",
-        },
-        grid: {
-          display: false,
-        },
-      },
-    },
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div
+          className="bg-white p-2 rounded shadow text-xs border"
+          style={{ fontFamily: "Lato, sans-serif", fontSize: "12px" }}
+        >
+          <p className="font-semibold">Day: {label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color }}>
+              {entry.name}: {entry.value}%
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -169,8 +122,75 @@ const HiringInsights = ({ initialData = null }) => {
         </div>
       </div>
 
-      {chartData ? (
-        <Line options={options} data={chartData} />
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={data}>
+            {/* ✅ Only Y-Axis Grid Lines (Horizontal) */}
+            <CartesianGrid
+              stroke="#e5e7eb"
+              strokeDasharray="3 3"
+              vertical={false}
+              horizontal={true}
+            />
+            <XAxis
+              dataKey="day"
+              stroke="#6b7280"
+              tick={{
+                fontSize: 12,
+                fontFamily: "Lato, sans-serif",
+                fill: "#6b7280",
+              }}
+              axisLine={{ stroke: "#d1d5db" }}
+              tickLine={{ stroke: "#d1d5db" }}
+            />
+            <YAxis
+              stroke="#6b7280"
+              tickFormatter={(value) => `${value}%`}
+              domain={[0, 100]}
+              tick={{
+                fontSize: 12,
+                fontFamily: "Lato, sans-serif",
+                fill: "#6b7280",
+              }}
+              axisLine={{ stroke: "#d1d5db" }}
+              tickLine={{ stroke: "#d1d5db" }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend
+              verticalAlign="bottom"
+              iconType="circle"
+              wrapperStyle={{
+                fontSize: "12px",
+                fontFamily: "Lato, sans-serif",
+                marginTop: "8px",
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="applicationToInterviewRate"
+              stroke="#22c55e"
+              strokeWidth={2}
+              dot={false}
+              name="Application to Interview Rate"
+            />
+            <Line
+              type="monotone"
+              dataKey="offerAcceptanceRate"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={false}
+              name="Offer Acceptance Rate"
+            />
+            <Line
+              type="monotone"
+              dataKey="rejectionRate"
+              stroke="#f97316"
+              strokeWidth={2}
+              dot={false}
+              name="Rejection Rate"
+            />
+          </LineChart>
+        </ResponsiveContainer>
       ) : (
         <div className="text-center py-10 text-gray-500">Loading chart...</div>
       )}
